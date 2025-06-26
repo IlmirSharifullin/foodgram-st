@@ -1,9 +1,9 @@
 import base64
 from django.core.files.base import ContentFile
 from djoser.serializers import UserCreateSerializer
-from users.models import User, Favourite
+from user.models import User, Favorite
 from rest_framework import serializers
-from recipes.models import Ingredient, Recipe, RecipeIngredient
+from recipe.models import Ingredient, Recipe, RecipeIngredient
 
 
 class RecipeIngredientWriteSerializer(serializers.ModelSerializer):
@@ -96,7 +96,7 @@ class RecipeSerializer(serializers.ModelSerializer):
     def get_is_favorited(self, obj):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
-            return obj.in_favourites.filter(user=request.user).exists()
+            return obj.in_favorites.filter(user=request.user).exists()
         return False
 
     def get_is_in_shopping_cart(self, obj):
@@ -189,7 +189,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
     cooking_time = serializers.IntegerField(read_only=True)
 
     class Meta:
-        model = Favourite
+        model = Favorite
         fields = ("id", "name", "image", "cooking_time")
 
 

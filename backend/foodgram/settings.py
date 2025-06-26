@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -25,20 +25,25 @@ SECRET_KEY = 'django-insecure-q@g7bry(q!v%o)sslnxx(jsd_s(6&^l=j*x-ok66%mzpawt&_i
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'recipe',
-    'user',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'django_filters',
+    'rest_framework.authtoken',
+    'djoser',
+    'corsheaders',
+    'recipe',
+    'user',
 ]
 
 MIDDLEWARE = [
@@ -49,6 +54,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'foodgram.urls'
@@ -75,9 +81,13 @@ WSGI_APPLICATION = 'foodgram.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("POSTGRES_DB", "foodgram"),
+        "USER": os.getenv("POSTGRES_USER", "postgres"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
+        "HOST": os.getenv("DB_HOST", ""),
+        "PORT": os.getenv("DB_PORT", 5432),
     }
 }
 
@@ -100,11 +110,15 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ru-RU'
 
 TIME_ZONE = 'UTC'
 
@@ -113,12 +127,31 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "static"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-STATIC_URL = 'static/'
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/media/"
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+CORS_URLS_REGEX = r"^/api/.*$"
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+DJOSER = {
+    "LOGIN_FIELD": "email",
+    "SERIALIZERS": {
+        "user_create": "api.serializers.CustomUserCreateSerializer",
+        "user": "api.serializers.UserSerializer",
+        "current_user": "api.serializers.UserSerializer",
+    },
+}
+
+AUTH_USER_MODEL = "user.User"
