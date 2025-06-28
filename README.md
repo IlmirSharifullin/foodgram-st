@@ -1,4 +1,32 @@
-Находясь в папке infra, выполните команду docker-compose up. При выполнении этой команды контейнер frontend, описанный в docker-compose.yml, подготовит файлы, необходимые для работы фронтенд-приложения, а затем прекратит свою работу.
+# Foodgram - Портал рецептов блюд от разных пользователей 😋
 
-По адресу http://localhost изучите фронтенд веб-приложения, а по адресу http://localhost/api/docs/ — спецификацию API.
+## Запуск проекта
 
+### Требования
+- Docker Compose
+
+### 1. Клон репозитория
+```bash
+git clone https://github.com/IlmirSharifullin/foodgram-st.git
+cd foodgram-st
+```
+
+### 2. Настройка окружения
+```bash
+# .env
+POSTGRES_USER=postgres
+POSTGRES_DB=foodgram
+POSTGRES_PASSWORD=12345
+DB_PORT=5432
+DB_HOST=db
+```
+
+### 3. Запуск контейнеров
+```bash
+docker-compose up --build
+```
+
+### 4. Заполнение базы данных
+```bash
+docker exec -it foodgram-backend python manage.py loaddata data/fill_db.json
+```
