@@ -1,10 +1,15 @@
 from django.db import models
 from django.conf import settings
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
+
+
+MIN_VALUE = 1
+MAX_VALUE = 32000
 
 
 class Ingredient(models.Model):
     class Meta:
+        ordering = ['name']
         verbose_name = "Ингредиент"
         verbose_name_plural = "Ингредиенты"
 
@@ -16,6 +21,9 @@ class Ingredient(models.Model):
         max_length=128,
         verbose_name="Название",
     )
+
+    def __str__(self):
+        return self.name
 
 
 class Recipe(models.Model):
@@ -29,11 +37,12 @@ class Recipe(models.Model):
         max_length=256,
         verbose_name="Название",
     )
-    description = models.TextField(
+    text = models.TextField(
         verbose_name="Описание",
     )
-    cooking_time = models.IntegerField(
-        validators=[MinValueValidator(1)],
+    cooking_time = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(MIN_VALUE),
+                    MaxValueValidator(MAX_VALUE)],
         verbose_name="Время приготовления",
     )
     image = models.ImageField(
@@ -58,20 +67,32 @@ class Recipe(models.Model):
         verbose_name="Ингредиенты",
     )
 
+    def __str__(self):
+        return self.name
+
 
 class RecipeIngredient(models.Model):
+    class Meta:
+        verbose_name = "рецепт и ингредиент"
+        verbose_name_plural = "Рецепты и ингредиенты"
+        ordering = ["-recipe__created_at", "ingredient__name"]
+
+
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
         verbose_name="Рецепт",
+        related_name="recipe_ingredients",
     )
     ingredient = models.ForeignKey(
         Ingredient,
         on_delete=models.CASCADE,
         verbose_name="Ингредиент",
     )
-    amount = models.IntegerField()
+    amount = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(MIN_VALUE),
+                    MaxValueValidator(MAX_VALUE)],
+    )
 
-    class Meta:
-        verbose_name = "рецепт и ингредиент"
-        verbose_name_plural = "Рецепты и ингредиенты"
+    def __str__(self):
+        return f'{self.ingredient.name} for {self.recipe.name}'
