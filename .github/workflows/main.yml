@@ -212,6 +212,7 @@ jobs:
         working-directory: k8s/helm
         run: |
           helm dependency update
+          kubectl -n foodgram delete job backend-migrations backend-loaddata --ignore-not-found
           helm upgrade --install foodgram ./ \
             --namespace foodgram \
             --create-namespace \
