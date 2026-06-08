@@ -13,7 +13,7 @@ global:
     redis: redis-configmap
   images: 
     api:
-      name: udazzzz/foodgram_backend:latest
+      name: ilmirsharifullin/foodgram_backend:latest
       pullPolicy: Always
 
 backend:
@@ -86,7 +86,7 @@ backend:
 
 nginx:
   name: nginx
-  image: udazzzz/foodgram_frontend:latest
+  image: ilmirsharifullin/foodgram_frontend:latest
   imagePullPolicy: IfNotPresent
   port: 80
   volumeMountPath: /app/media/

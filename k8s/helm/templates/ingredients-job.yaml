@@ -12,23 +12,23 @@ spec:
           imagePullPolicy: {{ .Values.global.images.api.pullPolicy }}
           command: {{ toJson .Values.jobLoaddata.command }}
           env:
-            - name: POSTGRES_USER
+            {{- $global := .Values.global }}
+            {{- range $alias, $mapping := .Values.backend.env.secret }}
+              {{- range $key, $val := $mapping }}
+            - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.secret.db }}
-                  key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
+                  name: {{ index $global.secret $alias }}
+                  key: {{ $val }}
+              {{- end }}
+            {{- end }}
+            {{- range $alias, $mapping := .Values.backend.env.config }}
+              {{- range $key, $val := $mapping }}
+            - name: {{ $key }}
               valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.secret.db }}
-                  key: POSTGRES_PASSWORD
-            - name: POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.secret.db }}
-                  key: POSTGRES_DB
-            - name: DB_HOST
-              value: "{{ .Values.global.db.host }}"
-            - name: DB_PORT
-              value: "{{ .Values.global.db.port }}"
+                configMapKeyRef:
+                  name: {{ index $global.config $alias }}
+                  key: {{ $val }}
+              {{- end }}
+            {{- end }}
       restartPolicy: {{ .Values.jobLoaddata.restartPolicy }}

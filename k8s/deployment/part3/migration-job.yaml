@@ -8,7 +8,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: udazzzz/foodgram_backend:latest
+        image: ilmirsharifullin/foodgram_backend:latest
         command: ["python", "manage.py", "migrate", "--noinput"]
         envFrom:
         - secretRef:

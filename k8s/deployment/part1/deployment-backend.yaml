@@ -47,7 +47,7 @@ spec:
 
       containers:
       - name: backend
-        image: udazzzz/foodgram_backend:latest
+        image: ilmirsharifullin/foodgram_backend:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000

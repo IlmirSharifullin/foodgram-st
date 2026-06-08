@@ -1,0 +1,15 @@
+dependencies:
+- name: rabbitmq
+  repository: file://charts/rabbitmq
+  version: 0.1.0
+- name: flower
+  repository: file://charts/flower
+  version: 0.1.0
+- name: celery-worker
+  repository: file://charts/celery-worker
+  version: 0.1.0
+- name: redis
+  repository: file://charts/redis
+  version: 0.1.0
+digest: sha256:4bb9db82e0e4dd02d1bc5bfd553f4dece4eaa14537d562058989e0b7a6e525fe
+generated: "2026-06-08T13:40:10.411524+03:00"
