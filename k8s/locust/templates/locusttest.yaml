@@ -12,6 +12,9 @@ spec:
     --run-time={{ .Values.locust.runTime }}
     --users={{ .Values.locust.users }}
     --spawn-rate={{ .Values.locust.spawnRate }}
+    --autostart
+    --autoquit=30
+    --expect-workers={{ .Values.locust.workers }}
   env:
     - name: LOCUST_LOGLEVEL
       value: {{ .Values.locust.logLevel | quote }}

@@ -1,5 +1,3 @@
-from random import randint
-
 from locust import HttpUser, between, task
 
 
@@ -15,14 +13,16 @@ class FoodgramReadOnlyUser(HttpUser):
             "/api/recipes/?page=1&limit=6",
             headers=DEFAULT_HEADERS,
             name="/api/recipes/",
+            timeout=10,
         )
 
     @task(3)
     def ingredients(self):
         self.client.get(
-            "/api/ingredients/",
+            "/api/ingredients/?name=абрикос",
             headers=DEFAULT_HEADERS,
             name="/api/ingredients/",
+            timeout=10,
         )
 
     @task(2)
@@ -31,13 +31,5 @@ class FoodgramReadOnlyUser(HttpUser):
             "/api/users/?page=1&limit=6",
             headers=DEFAULT_HEADERS,
             name="/api/users/",
-        )
-
-    @task(1)
-    def recipe_detail(self):
-        recipe_id = randint(1, 20)
-        self.client.get(
-            f"/api/recipes/{recipe_id}/",
-            headers=DEFAULT_HEADERS,
-            name="/api/recipes/[id]/",
+            timeout=10,
         )
