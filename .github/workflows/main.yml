@@ -4,62 +4,193 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: foodgram-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/foodgram_backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/foodgram_frontend
 
 jobs:
   checkout-code-pep8:
-    runs-on: ubuntu-latest
+    runs-on: foodgram-runner-set
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip 
+          python -m pip install --upgrade pip
           pip install ruff==0.8.0
       - name: Tests
-        run: |
-          python -m ruff check backend/
+        run: python -m ruff check backend/
+
+  release:
+    name: Create semantic release
+    runs-on: foodgram-runner-set
+    needs: checkout-code-pep8
+    outputs:
+      published: ${{ steps.semantic.outputs.new_release_published }}
+      version: ${{ steps.semantic.outputs.new_release_version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Semantic release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build_backend_and_push_to_docker_hub:
-    name: Push Docker image to DockerHub
-    runs-on: ubuntu-latest
-    needs: checkout-code-pep8
+    name: Build and push backend image
+    runs-on: foodgram-runner-set
+    timeout-minutes: 45
+    needs: release
+    if: needs.release.outputs.published == 'true'
     steps:
-      - name: Check out the repo
+      - name: Check out code
         uses: actions/checkout@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Login to Docker
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Push to DockerHub
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend/
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/foodgram_backend:latest
+      - name: Check Docker daemon
+        run: docker info
+      - name: Pull backend cache image
+        run: docker pull "${BACKEND_IMAGE}:latest" || true
+      - name: Build backend image
+        run: |
+          docker build \
+            --cache-from "${BACKEND_IMAGE}:latest" \
+            --tag "${BACKEND_IMAGE}:${{ needs.release.outputs.version }}" \
+            --tag "${BACKEND_IMAGE}:latest" \
+            ./backend/
+      - name: Push backend image
+        run: |
+          docker push "${BACKEND_IMAGE}:${{ needs.release.outputs.version }}"
+          docker push "${BACKEND_IMAGE}:latest"
 
   build_frontend_and_push_to_docker_hub:
-    name: Push frontend Docker image to DockerHub
-    runs-on: ubuntu-latest
+    name: Build and push frontend image
+    runs-on: foodgram-runner-set
+    timeout-minutes: 45
+    needs: release
+    if: needs.release.outputs.published == 'true'
     steps:
-      - name: Check out the repo
+      - name: Check out code
         uses: actions/checkout@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Login to Docker
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Push to DockerHub
-        uses: docker/build-push-action@v5
+      - name: Check Docker daemon
+        run: docker info
+      - name: Pull frontend cache image
+        run: docker pull "${FRONTEND_IMAGE}:latest" || true
+      - name: Build frontend image
+        run: |
+          docker build \
+            --cache-from "${FRONTEND_IMAGE}:latest" \
+            --tag "${FRONTEND_IMAGE}:${{ needs.release.outputs.version }}" \
+            --tag "${FRONTEND_IMAGE}:latest" \
+            ./frontend/
+      - name: Push frontend image
+        run: |
+          docker push "${FRONTEND_IMAGE}:${{ needs.release.outputs.version }}"
+          docker push "${FRONTEND_IMAGE}:latest"
+
+  deploy:
+    name: Deploy release to Kubernetes
+    runs-on: foodgram-runner-set
+    needs:
+      - release
+      - build_backend_and_push_to_docker_hub
+      - build_frontend_and_push_to_docker_hub
+    if: needs.release.outputs.published == 'true'
+    env:
+      KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
+      VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+      VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+      RELEASE_VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          context: ./frontend/
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/foodgram_frontend:latest
+          python-version: "3.10"
+      - name: Load secrets from Vault
+        id: vault
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          vault_addr = os.environ["VAULT_ADDR"].rstrip("/")
+          vault_token = os.environ["VAULT_TOKEN"]
+
+          def read_secret(path):
+              request = urllib.request.Request(
+                  f"{vault_addr}/v1/{path}",
+                  headers={"X-Vault-Token": vault_token},
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  payload = json.load(response)
+              data = payload["data"]
+              return data.get("data", data)
+
+          db = read_secret("secrets/data/db")
+          redis = read_secret("secrets/data/redis")
+
+          outputs = {
+              "postgres_user": db["POSTGRES_USER"],
+              "postgres_password": db["POSTGRES_PASSWORD"],
+              "postgres_db": db["POSTGRES_DB"],
+              "redis_password": redis["password"],
+          }
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              for key, value in outputs.items():
+                  output.write(f"{key}={value}\n")
+          PY
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${KUBE_CONFIG_B64}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+      - name: Deploy Helm release
+        working-directory: k8s/helm
+        run: |
+          helm dependency update
+          helm upgrade --install foodgram ./ \
+            --namespace foodgram \
+            --create-namespace \
+            -f values.yaml \
+            --set global.images.api.name="${BACKEND_IMAGE}:${RELEASE_VERSION}" \
+            --set nginx.image="${FRONTEND_IMAGE}:${RELEASE_VERSION}" \
+            --set-string postgres.secret.username="${{ steps.vault.outputs.postgres_user }}" \
+            --set-string postgres.secret.password="${{ steps.vault.outputs.postgres_password }}" \
+            --set-string postgres.secret.database="${{ steps.vault.outputs.postgres_db }}" \
+            --set-string redis.secret.password="${{ steps.vault.outputs.redis_password }}"
